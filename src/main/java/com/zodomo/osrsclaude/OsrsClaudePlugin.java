@@ -41,7 +41,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @PluginDescriptor(
@@ -71,28 +70,19 @@ public class OsrsClaudePlugin extends Plugin
 	@Inject
 	private Gson gson;
 
+	@Inject
 	private OkHttpClient httpClient;
 
 	@Override
 	protected void startUp() throws Exception
 	{
 		log.info("Claude Chat plugin started");
-		httpClient = new OkHttpClient.Builder()
-			.connectTimeout(30, TimeUnit.SECONDS)
-			.readTimeout(60, TimeUnit.SECONDS)
-			.writeTimeout(30, TimeUnit.SECONDS)
-			.build();
 	}
 
 	@Override
 	protected void shutDown() throws Exception
 	{
 		log.info("Claude Chat plugin stopped");
-		if (httpClient != null)
-		{
-			httpClient.dispatcher().executorService().shutdown();
-			httpClient.connectionPool().evictAll();
-		}
 	}
 
 	@Subscribe
