@@ -16,12 +16,13 @@ import net.runelite.api.Quest;
 import net.runelite.api.QuestState;
 import net.runelite.api.Skill;
 import net.runelite.api.coords.WorldPoint;
-import net.runelite.api.events.ChatMessage;
+import net.runelite.api.events.CommandExecuted;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.chat.ChatColorType;
 import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
@@ -45,18 +46,21 @@ import java.util.Map;
 @Slf4j
 @PluginDescriptor(
 	name = "Claude Chat",
-	description = "Chat with Claude AI in-game using !claude commands",
+	description = "Chat with Claude AI in-game using ::claude commands",
 	tags = {"claude", "ai", "chat", "anthropic"}
 )
 public class OsrsClaudePlugin extends Plugin
 {
-	private static final String COMMAND_PREFIX = "!claude ";
+	private static final String COMMAND_NAME = "claude";
 	private static final String API_URL = "https://api.anthropic.com/v1/messages";
 	private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 	private static final int MAX_CHARS_PER_MESSAGE = 200;
 
 	@Inject
 	private Client client;
+
+	@Inject
+	private ClientThread clientThread;
 
 	@Inject
 	private OsrsClaudeConfig config;
@@ -86,25 +90,21 @@ public class OsrsClaudePlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onChatMessage(ChatMessage event)
+	public void onCommandExecuted(CommandExecuted event)
 	{
-		if (event.getType() != ChatMessageType.PUBLICCHAT)
+		if (!event.getCommand().equalsIgnoreCase(COMMAND_NAME))
 		{
 			return;
 		}
 
-		String message = event.getMessage();
-		if (!message.toLowerCase().startsWith(COMMAND_PREFIX))
+		String[] args = event.getArguments();
+		if (args == null || args.length == 0)
 		{
+			sendChatMessage("Please provide a prompt after ::claude");
 			return;
 		}
 
-		String prompt = message.substring(COMMAND_PREFIX.length()).trim();
-		if (prompt.isEmpty())
-		{
-			sendChatMessage("Please provide a prompt after !claude");
-			return;
-		}
+		String prompt = String.join(" ", args);
 
 		String apiKey = config.apiKey();
 		if (apiKey == null || apiKey.isEmpty())
@@ -114,7 +114,9 @@ public class OsrsClaudePlugin extends Plugin
 		}
 
 		sendChatMessage("Asking Claude...");
-		callClaudeApi(prompt);
+
+		// Defer API call to avoid script reentrance - Quest.getState() runs scripts
+		clientThread.invokeLater(() -> callClaudeApi(prompt));
 	}
 
 	private void callClaudeApi(String userPrompt)

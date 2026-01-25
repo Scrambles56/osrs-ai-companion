@@ -40,6 +40,6 @@ public interface OsrsClaudeConfig extends Config
 	)
 	default ClaudeModel model()
 	{
-		return ClaudeModel.SONNET;
+		return ClaudeModel.HAIKU;
 	}
 }
