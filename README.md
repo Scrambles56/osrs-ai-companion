@@ -1,6 +1,6 @@
 # OSRS Claude
 
-Chat with Claude AI directly in Old School RuneScape using the `!claude` command.
+Chat with Claude AI directly in Old School RuneScape using the `::claude` command.
 
 ## Features
 
@@ -48,7 +48,7 @@ Claude will respond in your chat window with helpful information.
 |---------|-------------|---------|
 | Claude API Key | Your Anthropic API key | (empty) |
 | Response Batches | Number of 200-char message batches (1-10) | 3 |
-| Claude Model | Which Claude model to use | Claude Sonnet 4.5 |
+| Claude Model | Which Claude model to use | Claude Haiku 4.5 |
 
 ## Building
 
