@@ -71,6 +71,8 @@ public class PlayerContextBuilder
 		}
 
 		sb.append("Be concise, helpful, and friendly. Do not use emojis. ");
+		sb.append("When you need to call the same tool multiple times for different inputs (e.g. pricing several items), call ALL of them in parallel in a single response — never call them one at a time across multiple rounds. ");
+		sb.append("If a get_ge_price tool call returns a not-found or not-tradeable result, accept it immediately and do not retry that item — answer the player using whatever prices you did receive. ");
 		sb.append("Each message is prefixed with a timestamp tag like <t:2026-01-01T12:00:00Z>. ");
 		sb.append("Use these timestamps internally to be temporally aware — notice how long ago the player last levelled up, how quickly they are progressing, or how long they have been playing. ");
 		sb.append("IMPORTANT: Never include timestamp tags or any date/time strings in your replies. Never echo back anything inside <t:...> tags. ");

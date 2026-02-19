@@ -175,17 +175,17 @@ public class AiCompanionPanel extends PluginPanel
 		);
 	}
 
-	public void appendClaudeMessage(String text)
+	public void appendClaudeMessage(String text, String responseModel)
 	{
 		removeThinkingIndicator();
-		String stripped = stripEmoji(text);
-		String escaped = escapeHtml(stripped).replace("\n", "<br>");
-		String name = escapeHtml(getPersonaName());
+		String stripped = stripEmoji(stripTimestampTags(text));
+		String rendered = renderMarkdown(stripped);
+		String name = escapeHtml(getPersonaName(responseModel));
 		appendHtml(
 			"<div class='claude-row'>" +
 			"<div class='claude-bubble'>" +
 			"<div class='label'>" + name + "</div>" +
-			escaped +
+			rendered +
 			"</div></div>"
 		);
 		setInputEnabled(true);
@@ -201,7 +201,7 @@ public class AiCompanionPanel extends PluginPanel
 
 	public void appendThinkingIndicator()
 	{
-		String name = escapeHtml(getPersonaName());
+		String name = escapeHtml(getPersonaName(null));
 		appendHtml("<div id='thinking' class='thinking'>" + name + " is thinking...</div>");
 		thinkingElement = ((HTMLDocument) chatArea.getDocument()).getElement("thinking");
 	}
@@ -227,10 +227,20 @@ public class AiCompanionPanel extends PluginPanel
 		sendButton.setEnabled(enabled);
 	}
 
-	private String getPersonaName()
+	private String getPersonaName(String responseModel)
 	{
 		CompanionTone tone = plugin.getCompanionTone();
-		return tone != null ? tone.getDisplayName() : "Claude";
+		String name = tone != null ? tone.getDisplayName() : "Claude";
+		if (plugin.isDeveloperMode() && responseModel != null)
+		{
+			// Shorten the model ID to something readable, e.g.
+			// "claude-haiku-4-5-20251001" → "haiku-4-5"
+			String shortModel = responseModel
+				.replaceFirst("^claude-", "")
+				.replaceFirst("-\\d{8}$", "");
+			name += " [" + shortModel + "]";
+		}
+		return name;
 	}
 
 	private String buildClaudeCss()
@@ -257,6 +267,15 @@ public class AiCompanionPanel extends PluginPanel
 		);
 	}
 
+	private static String stripTimestampTags(String text)
+	{
+		if (text == null)
+		{
+			return "";
+		}
+		return text.replaceAll("<t:[^>]*>\\s*", "").trim();
+	}
+
 	private static String stripEmoji(String text)
 	{
 		if (text == null)
@@ -264,6 +283,40 @@ public class AiCompanionPanel extends PluginPanel
 			return "";
 		}
 		return text.replaceAll("[\\x{1F000}-\\x{1FFFF}]|[\\x{2600}-\\x{27FF}]|[\\x{2300}-\\x{23FF}]|\\x{FE0F}", "").trim();
+	}
+
+	private static String renderMarkdown(String text)
+	{
+		if (text == null) return "";
+		// Split into lines and process each one
+		String[] lines = text.split("\n", -1);
+		StringBuilder html = new StringBuilder();
+		for (int i = 0; i < lines.length; i++)
+		{
+			String line = lines[i];
+			// Escape HTML special chars first
+			line = line
+				.replace("&", "&amp;")
+				.replace("<", "&lt;")
+				.replace(">", "&gt;")
+				.replace("\"", "&quot;");
+			// Bold: **text**
+			line = line.replaceAll("\\*\\*(.+?)\\*\\*", "<b>$1</b>");
+			// Italic: *text* (single, not inside bold)
+			line = line.replaceAll("(?<!\\*)\\*(?!\\*)(.+?)(?<!\\*)\\*(?!\\*)", "<i>$1</i>");
+			// Bullet points: lines starting with - or *
+			if (line.matches("^\\s*[-*]\\s+.*"))
+			{
+				line = "&nbsp;&nbsp;&nbsp;-&nbsp;" + line.replaceFirst("^\\s*[-*]\\s+", "");
+			}
+			html.append(line);
+			if (i < lines.length - 1)
+			{
+				// Blank line → paragraph break; otherwise line break
+				html.append(lines[i].isEmpty() ? "<br>" : "<br>");
+			}
+		}
+		return html.toString();
 	}
 
 	private static String escapeHtml(String text)

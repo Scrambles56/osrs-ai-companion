@@ -177,6 +177,11 @@ public class OsrsAiCompanionPlugin extends Plugin
 		return config.companionTone();
 	}
 
+	public boolean isDeveloperMode()
+	{
+		return Boolean.getBoolean("plugin.developerMode");
+	}
+
 	@Provides
 	OsrsAiCompanionConfig provideConfig(ConfigManager configManager)
 	{

@@ -52,7 +52,7 @@ public class ClaudeTools
 
 	private static final String WIKI_API = "https://oldschool.runescape.wiki/api.php";
 
-	private static final String GE_API = "https://prices.runescape.com/api/v1/osrs";
+	private static final String GE_API = "https://prices.runescape.wiki/api/v1/osrs";
 
 	private final Client client;
 	private final OkHttpClient httpClient;
@@ -99,7 +99,8 @@ public class ClaudeTools
 			"Looks up the current Grand Exchange price for an OSRS item by name. " +
 			"Returns the latest buy and sell prices from the OSRS GE. " +
 			"Use this when the player asks how much something costs, whether something is worth buying or selling, " +
-			"or when giving money-making or shopping advice that depends on current market prices.");
+			"or when giving money-making or shopping advice that depends on current market prices. " +
+			"When pricing multiple items (e.g. a full gear set), call this tool for ALL items in parallel in a single response rather than one at a time.");
 		JsonObject geProperties = new JsonObject();
 		JsonObject geItemProp = new JsonObject();
 		geItemProp.addProperty("type", "string");
@@ -254,17 +255,38 @@ public class ClaudeTools
 			return "No item name provided.";
 		}
 
-		// Resolve item name to ID via RuneLite's ItemManager search
+		// Resolve item name to ID via RuneLite's ItemManager search.
+		// If not found, ask the wiki — it understands that e.g. "Iron helmet" → "Iron full helm".
 		java.util.List<ItemPrice> results = itemManager.search(itemName);
+		String wikiTitle = null;
 		if (results == null || results.isEmpty())
 		{
-			return "No GE item found matching: " + itemName;
+			wikiTitle = resolveItemNameViaWiki(itemName);
+			if (wikiTitle != null)
+			{
+				results = itemManager.search(wikiTitle);
+			}
+		}
+		if (results == null || results.isEmpty())
+		{
+			// Item exists on the wiki but isn't tradeable on the GE — fetch a short
+			// description so Claude understands why and doesn't keep retrying.
+			String title = wikiTitle != null ? wikiTitle : itemName;
+			String snippet = fetchWikiSnippet(title);
+			if (snippet != null)
+			{
+				return "\"" + itemName + "\" is not tradeable on the GE. " + snippet;
+			}
+			return "\"" + itemName + "\" is not available on the Grand Exchange.";
 		}
 
-		// Use the best match (first result)
+		// Always use the best match — RuneLite's search handles fuzzy matching.
+		// Include the resolved name so Claude knows exactly what was looked up.
 		ItemPrice match = results.get(0);
 		int itemId = match.getId();
 		String resolvedName = match.getName();
+		String nameNote = resolvedName.equalsIgnoreCase(itemName.trim()) ? ""
+			: " (best match for \"" + itemName.trim() + "\")";
 
 		try
 		{
@@ -299,7 +321,7 @@ public class ClaudeTools
 					? priceData.get("low").getAsLong() : -1;
 
 				StringBuilder sb = new StringBuilder();
-				sb.append("GE prices for ").append(resolvedName).append(" (ID: ").append(itemId).append("):\n");
+				sb.append("GE prices for ").append(resolvedName).append(nameNote).append(":\n");
 				sb.append("  Sell price (high): ").append(high >= 0 ? String.format("%,d", high) + " gp" : "N/A").append("\n");
 				sb.append("  Buy price (low):   ").append(low >= 0 ? String.format("%,d", low) + " gp" : "N/A");
 				return sb.toString();
@@ -309,6 +331,86 @@ public class ClaudeTools
 		{
 			log.error("GE price lookup failed for: {}", itemName, e);
 			return "GE price lookup failed: " + e.getMessage();
+		}
+	}
+
+	/**
+	 * Fetches a short plain-text extract from an OSRS wiki page by exact title.
+	 * Returns null on failure.
+	 */
+	private String fetchWikiSnippet(String pageTitle)
+	{
+		try
+		{
+			okhttp3.HttpUrl url = okhttp3.HttpUrl.get(WIKI_API).newBuilder()
+				.addQueryParameter("action", "query")
+				.addQueryParameter("prop", "extracts")
+				.addQueryParameter("titles", pageTitle)
+				.addQueryParameter("exintro", "true")
+				.addQueryParameter("explaintext", "true")
+				.addQueryParameter("exchars", "200")
+				.addQueryParameter("format", "json")
+				.build();
+
+			Request request = new Request.Builder()
+				.url(url)
+				.header("User-Agent", "osrs-ai-companion/1.0 (RuneLite plugin)")
+				.build();
+
+			try (Response response = httpClient.newCall(request).execute())
+			{
+				if (!response.isSuccessful() || response.body() == null) return null;
+				JsonObject result = gson.fromJson(response.body().string(), JsonObject.class);
+				JsonObject pages = result.getAsJsonObject("query").getAsJsonObject("pages");
+				JsonObject page = pages.entrySet().iterator().next().getValue().getAsJsonObject();
+				String extract = page.has("extract") ? page.get("extract").getAsString().trim() : null;
+				return (extract != null && !extract.isEmpty()) ? extract : null;
+			}
+		}
+		catch (Exception e)
+		{
+			log.warn("Wiki snippet fetch failed for: {}", pageTitle, e);
+			return null;
+		}
+	}
+
+	/**
+	 * Queries the OSRS wiki search API and returns the title of the best-matching page.
+	 * Used to resolve informal item names (e.g. "Iron gloves") to their canonical OSRS
+	 * names (e.g. "Iron gauntlets") before looking up a GE price.
+	 * Returns null if no match is found or the request fails.
+	 */
+	private String resolveItemNameViaWiki(String itemName)
+	{
+		try
+		{
+			okhttp3.HttpUrl url = okhttp3.HttpUrl.get(WIKI_API).newBuilder()
+				.addQueryParameter("action", "query")
+				.addQueryParameter("list", "search")
+				.addQueryParameter("srsearch", itemName)
+				.addQueryParameter("srnamespace", "0")
+				.addQueryParameter("srlimit", "1")
+				.addQueryParameter("format", "json")
+				.build();
+
+			Request request = new Request.Builder()
+				.url(url)
+				.header("User-Agent", "osrs-ai-companion/1.0 (RuneLite plugin)")
+				.build();
+
+			try (Response response = httpClient.newCall(request).execute())
+			{
+				if (!response.isSuccessful() || response.body() == null) return null;
+				JsonObject result = gson.fromJson(response.body().string(), JsonObject.class);
+				JsonArray hits = result.getAsJsonObject("query").getAsJsonArray("search");
+				if (hits.size() == 0) return null;
+				return hits.get(0).getAsJsonObject().get("title").getAsString();
+			}
+		}
+		catch (Exception e)
+		{
+			log.warn("Wiki name resolution failed for: {}", itemName, e);
+			return null;
 		}
 	}
 
@@ -354,15 +456,52 @@ public class ClaudeTools
 				pageTitle = results.get(0).getAsJsonObject().get("title").getAsString();
 			}
 
-			// Second: fetch the page extract for the matched title
+			// Second: fetch section 1 (Details/infobox) as wikitext — quest/item pages
+			// store requirements, stats etc. there, which the plain extract API omits.
+			okhttp3.HttpUrl section1Url = okhttp3.HttpUrl.get(WIKI_API).newBuilder()
+				.addQueryParameter("action", "parse")
+				.addQueryParameter("page", pageTitle)
+				.addQueryParameter("prop", "wikitext")
+				.addQueryParameter("section", "1")
+				.addQueryParameter("format", "json")
+				.build();
+
+			Request section1Request = new Request.Builder()
+				.url(section1Url)
+				.header("User-Agent", "osrs-ai-companion/1.0 (RuneLite plugin)")
+				.build();
+
+			String section1Text = null;
+			try (Response section1Response = httpClient.newCall(section1Request).execute())
+			{
+				if (section1Response.isSuccessful() && section1Response.body() != null)
+				{
+					JsonObject parsed = gson.fromJson(section1Response.body().string(), JsonObject.class);
+					if (parsed.has("parse"))
+					{
+						String wikitext = parsed.getAsJsonObject("parse")
+							.getAsJsonObject("wikitext")
+							.get("*").getAsString().trim();
+						if (!wikitext.isEmpty())
+						{
+							section1Text = wikitext;
+						}
+					}
+				}
+			}
+			catch (Exception e)
+			{
+				log.debug("Section 1 fetch failed for {}, falling back to extract", pageTitle);
+			}
+
+			// Third: fetch a plain-text intro for general context
 			okhttp3.HttpUrl extractUrl = okhttp3.HttpUrl.get(WIKI_API).newBuilder()
 				.addQueryParameter("action", "query")
 				.addQueryParameter("prop", "extracts")
 				.addQueryParameter("titles", pageTitle)
-				.addQueryParameter("exintro", "false")
+				.addQueryParameter("exintro", "true")
 				.addQueryParameter("explaintext", "true")
-				.addQueryParameter("exsectionformat", "plain")
-				.addQueryParameter("exchars", "3000")
+				.addQueryParameter("exchars", "1000")
 				.addQueryParameter("format", "json")
 				.build();
 
@@ -373,27 +512,31 @@ public class ClaudeTools
 
 			try (Response extractResponse = httpClient.newCall(extractRequest).execute())
 			{
-				if (!extractResponse.isSuccessful() || extractResponse.body() == null)
+				String introText = "";
+				if (extractResponse.isSuccessful() && extractResponse.body() != null)
 				{
-					return "Wiki fetch failed: HTTP " + extractResponse.code();
+					JsonObject extractResult = gson.fromJson(extractResponse.body().string(), JsonObject.class);
+					JsonObject pages = extractResult.getAsJsonObject("query").getAsJsonObject("pages");
+					JsonObject page = pages.entrySet().iterator().next().getValue().getAsJsonObject();
+					introText = page.has("extract") ? page.get("extract").getAsString().trim() : "";
 				}
-				JsonObject extractResult = gson.fromJson(extractResponse.body().string(), JsonObject.class);
-				JsonObject pages = extractResult
-					.getAsJsonObject("query")
-					.getAsJsonObject("pages");
 
-				// Pages is keyed by page ID
-				JsonObject page = pages.entrySet().iterator().next().getValue().getAsJsonObject();
-				String extract = page.has("extract") ? page.get("extract").getAsString().trim() : "";
-
-				if (extract.isEmpty())
+				if (introText.isEmpty() && section1Text == null)
 				{
 					return "Wiki page '" + pageTitle + "' has no content.";
 				}
 
-				return "OSRS Wiki — " + pageTitle + ":\n\n" + extract;
-			}
-		}
+				StringBuilder result = new StringBuilder("OSRS Wiki \u2014 ").append(pageTitle).append(":\n\n");
+				if (!introText.isEmpty())
+				{
+					result.append(introText).append("\n\n");
+				}
+				if (section1Text != null)
+				{
+					result.append("--- Details/Infobox ---\n").append(section1Text);
+				}
+				return result.toString();
+			}		}
 		catch (Exception e)
 		{
 			log.error("Wiki search failed for query: {}", query, e);
