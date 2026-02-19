@@ -49,7 +49,7 @@ public class ClaudeClient
 		userMessage.addProperty("content", withTimestamp(userPrompt));
 		conversationHistory.add(userMessage);
 
-		// buildSystemPrompt() calls Quest.getState() which requires the client thread
+		// buildSlowSystemPrompt() calls Quest.getState() which requires the client thread
 		clientThread.invokeLater(() -> callApi(panel));
 	}
 
@@ -58,7 +58,7 @@ public class ClaudeClient
 		conversationHistory.clear();
 	}
 
-	// Must be called on the client thread (buildSystemPrompt needs it)
+	// Must be called on the client thread (buildSlowSystemPrompt needs it for Quest.getState())
 	public void callApi(AiCompanionPanel panel)
 	{
 		apiCallInProgress = true;
@@ -66,20 +66,74 @@ public class ClaudeClient
 		JsonObject requestBody = new JsonObject();
 		requestBody.addProperty("model", config.model().getModelId());
 		requestBody.addProperty("max_tokens", config.maxTokens());
-		requestBody.addProperty("system", contextBuilder.buildSystemPrompt());
+		JsonObject cacheControl = new JsonObject();
+		cacheControl.addProperty("type", "ephemeral");
+
+		JsonObject slowBlock = new JsonObject();
+		slowBlock.addProperty("type", "text");
+		slowBlock.addProperty("text", contextBuilder.buildSlowSystemPrompt());
+		slowBlock.add("cache_control", cacheControl);
+
+		JsonObject fastBlock = new JsonObject();
+		fastBlock.addProperty("type", "text");
+		fastBlock.addProperty("text", contextBuilder.buildFastSystemPrompt());
+
+		JsonArray systemBlocks = new JsonArray();
+		systemBlocks.add(slowBlock);
+		systemBlocks.add(fastBlock);
+
+		requestBody.add("system", systemBlocks);
 		requestBody.add("tools", ClaudeTools.buildToolDefinitions());
 
-		JsonArray messages = new JsonArray();
-		synchronized (conversationHistory)
-		{
-			for (JsonObject msg : conversationHistory)
-			{
-				messages.add(msg);
-			}
-		}
+		JsonArray messages = buildMessagesWithCache();
 		requestBody.add("messages", messages);
 
 		enqueueRequest(requestBody, panel);
+	}
+
+	// Builds the messages array, placing a cache_control breakpoint on the second-to-last
+	// message so the full conversation history up to that point gets cached between turns.
+	// Only messages with plain string content are wrapped; array-content messages (tool
+	// use / tool result turns) are passed through unchanged.
+	private JsonArray buildMessagesWithCache()
+	{
+		synchronized (conversationHistory)
+		{
+			JsonArray messages = new JsonArray();
+			int size = conversationHistory.size();
+			// We cache up to (but not including) the final user message, so we need at
+			// least 2 messages for the breakpoint to make sense.
+			int cacheIndex = size - 2;
+
+			for (int i = 0; i < size; i++)
+			{
+				JsonObject msg = conversationHistory.get(i);
+				if (i == cacheIndex && msg.get("content").isJsonPrimitive())
+				{
+					// Wrap the plain-string content in an array block with cache_control
+					JsonObject textBlock = new JsonObject();
+					textBlock.addProperty("type", "text");
+					textBlock.addProperty("text", msg.get("content").getAsString());
+
+					JsonObject cacheControl = new JsonObject();
+					cacheControl.addProperty("type", "ephemeral");
+					textBlock.add("cache_control", cacheControl);
+
+					JsonArray contentArray = new JsonArray();
+					contentArray.add(textBlock);
+
+					JsonObject cachedMsg = new JsonObject();
+					cachedMsg.addProperty("role", msg.get("role").getAsString());
+					cachedMsg.add("content", contentArray);
+					messages.add(cachedMsg);
+				}
+				else
+				{
+					messages.add(msg);
+				}
+			}
+			return messages;
+		}
 	}
 
 	private void enqueueRequest(JsonObject requestBody, AiCompanionPanel panel)
@@ -89,6 +143,7 @@ public class ClaudeClient
 			.header("Content-Type", "application/json")
 			.header("x-api-key", config.apiKey())
 			.header("anthropic-version", "2023-06-01")
+			.header("anthropic-beta", "prompt-caching-2024-07-31")
 			.post(RequestBody.create(JSON, gson.toJson(requestBody)))
 			.build();
 
@@ -188,26 +243,24 @@ public class ClaudeClient
 				}
 				String toolUseId = block.get("id").getAsString();
 				String toolName = block.get("name").getAsString();
+				JsonObject toolInput = block.has("input") ? block.getAsJsonObject("input") : null;
 
-				// Tool execution must happen on the client thread (varbit reads)
-				clientThread.invokeLater(() -> {
-					String toolResult = executeTool(toolName);
-
-					JsonObject resultContent = new JsonObject();
-					resultContent.addProperty("type", "tool_result");
-					resultContent.addProperty("tool_use_id", toolUseId);
-					resultContent.addProperty("content", toolResult);
-
-					toolResults.add(resultContent);
-
-					JsonObject toolResultMessage = new JsonObject();
-					toolResultMessage.addProperty("role", "user");
-					toolResultMessage.add("content", toolResults);
-					conversationHistory.add(toolResultMessage);
-
-					// Re-call the API with the tool result, reusing same system prompt etc.
-					enqueueRequest(requestBody, panel);
-				});
+				// HTTP tools run on OkHttp's thread pool to avoid blocking the client thread.
+				// All other tools read game state and must run on the client thread.
+				if ("search_wiki".equals(toolName) || "get_ge_price".equals(toolName))
+				{
+					httpClient.dispatcher().executorService().execute(() -> {
+						String toolResult = executeTool(toolName, toolInput);
+						addToolResultAndContinue(toolUseId, toolResult, toolResults, requestBody, panel);
+					});
+				}
+				else
+				{
+					clientThread.invokeLater(() -> {
+						String toolResult = executeTool(toolName, toolInput);
+						addToolResultAndContinue(toolUseId, toolResult, toolResults, requestBody, panel);
+					});
+				}
 			}
 		}
 		else
@@ -245,9 +298,27 @@ public class ClaudeClient
 		}
 	}
 
-	private String executeTool(String toolName)
+	private String executeTool(String toolName, JsonObject input)
 	{
-		return claudeTools.execute(toolName);
+		return claudeTools.execute(toolName, input);
+	}
+
+	private void addToolResultAndContinue(String toolUseId, String toolResult,
+		JsonArray toolResults, JsonObject requestBody, AiCompanionPanel panel)
+	{
+		JsonObject resultContent = new JsonObject();
+		resultContent.addProperty("type", "tool_result");
+		resultContent.addProperty("tool_use_id", toolUseId);
+		resultContent.addProperty("content", toolResult);
+
+		toolResults.add(resultContent);
+
+		JsonObject toolResultMessage = new JsonObject();
+		toolResultMessage.addProperty("role", "user");
+		toolResultMessage.add("content", toolResults);
+		conversationHistory.add(toolResultMessage);
+
+		enqueueRequest(requestBody, panel);
 	}
 
 	private static String extractText(JsonArray contentBlocks)

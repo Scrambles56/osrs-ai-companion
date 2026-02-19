@@ -60,7 +60,7 @@ public class OsrsAiCompanionPlugin extends Plugin
 	protected void startUp() throws Exception
 	{
 		PlayerContextBuilder contextBuilder = new PlayerContextBuilder(client, itemManager, config);
-		ClaudeTools claudeTools = new ClaudeTools(client);
+		ClaudeTools claudeTools = new ClaudeTools(client, httpClient, gson, itemManager);
 		claudeClient = new ClaudeClient(httpClient, gson, config, contextBuilder, claudeTools, clientThread);
 
 		panel = new AiCompanionPanel(this);

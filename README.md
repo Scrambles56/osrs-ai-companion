@@ -42,6 +42,8 @@ Every message Claude receives includes a full snapshot of your current state:
 Claude can request additional detail on demand rather than loading everything every time:
 - **Achievement diary status** — full per-region, per-tier breakdown including individual task progress
 - **Combat achievement status** — tier completion across all six CA tiers
+- **OSRS Wiki search** — looks up accurate, up-to-date game information (quest requirements, item stats, training methods, etc.)
+- **Grand Exchange prices** — fetches live buy/sell prices for any item by name
 
 ## Setup
 
@@ -75,6 +77,7 @@ JAVA_HOME=/opt/homebrew/Cellar/openjdk@11/11.0.30/libexec/openjdk.jdk/Contents/H
 | Claude API Key | Your Anthropic API key | (empty) |
 | Model | Claude model to use (Haiku / Sonnet / Opus) | Haiku |
 | Max Tokens | Maximum response length | 1024 |
+| Companion Tone | Personality Claude adopts (None, Wise Old Man, Drunken Dwarf, Proud Dad, Bob, Zamorak Zealot) | None |
 | Player Goal | Persistent goal Claude always keeps in mind | (empty) |
 
 ### Event Celebrations
@@ -88,18 +91,7 @@ Individual toggles for each event type — level-ups, XP milestones, quest compl
 
 ## Building
 
-Requires Java 11:
-
-```bash
-# macOS with Homebrew
-brew install openjdk@11
-
-# Build
-JAVA_HOME=/opt/homebrew/Cellar/openjdk@11/11.0.30/libexec/openjdk.jdk/Contents/Home ./gradlew build
-
-# Run in development mode
-JAVA_HOME=/opt/homebrew/Cellar/openjdk@11/11.0.30/libexec/openjdk.jdk/Contents/Home ./gradlew run
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions across macOS, Windows, and Linux.
 
 ## Notes
 

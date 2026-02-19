@@ -29,16 +29,11 @@ public class PlayerContextBuilder
 	private final ItemManager itemManager;
 	private final OsrsAiCompanionConfig config;
 
-	public String buildSystemPrompt()
+	public String buildSlowSystemPrompt()
 	{
 		String playerName = getPlayerName();
 		Player localPlayer = client.getLocalPlayer();
 		int combatLevel = localPlayer != null ? localPlayer.getCombatLevel() : 0;
-		int currentHp = client.getBoostedSkillLevel(Skill.HITPOINTS);
-		int maxHp = client.getRealSkillLevel(Skill.HITPOINTS);
-		int currentPrayer = client.getBoostedSkillLevel(Skill.PRAYER);
-		int maxPrayer = client.getRealSkillLevel(Skill.PRAYER);
-		double runEnergy = client.getEnergy() / 100.0;
 
 		int totalLevel = 0;
 		long totalXp = 0;
@@ -54,21 +49,20 @@ public class PlayerContextBuilder
 
 		StringBuilder sb = new StringBuilder();
 		sb.append("You are Claude, an AI assistant responding to ").append(playerName).append(" in Old School RuneScape. ");
+
+		CompanionTone tone = config.companionTone();
+		if (tone != null && tone.getSystemPrompt() != null)
+		{
+			sb.append(tone.getSystemPrompt()).append(" ");
+		}
+
 		sb.append("Combat level: ").append(combatLevel).append(". ");
-		sb.append("HP: ").append(currentHp).append("/").append(maxHp).append(". ");
-		sb.append("Prayer: ").append(currentPrayer).append("/").append(maxPrayer).append(". ");
-		sb.append("Run energy: ").append(String.format("%.1f", runEnergy)).append("%. ");
 		sb.append("Total level: ").append(totalLevel).append(". ");
 		sb.append("Total XP: ").append(String.format("%,d", totalXp)).append(". ");
 		sb.append("Skill breakdown: ").append(getSkillBreakdown()).append(". ");
 		sb.append("Completed quests: ").append(emptyOr(getQuestsByState(QuestState.FINISHED), "None")).append(". ");
 		sb.append("Quests in progress: ").append(emptyOr(getQuestsByState(QuestState.IN_PROGRESS), "None")).append(". ");
-		sb.append("Inventory: ").append(emptyOr(getInventoryItems(), "Empty")).append(". ");
-		sb.append("Equipped: ").append(emptyOr(getEquippedItems(), "Nothing")).append(". ");
-		sb.append("Location: ").append(getPlayerLocation()).append(". ");
-		sb.append("Slayer task: ").append(getSlayerTask()).append(". ");
 		sb.append("Achievement diaries: ").append(emptyOr(getAchievementDiaryStatus(), "None completed")).append(". ");
-		sb.append("Bank: ").append(getBankContents()).append(". ");
 
 		String goal = config.playerGoal();
 		if (goal != null && !goal.trim().isEmpty())
@@ -84,6 +78,46 @@ public class PlayerContextBuilder
 		sb.append("such as their HP, location, what they're doing, or their goal — rather than giving a generic response.");
 
 		return sb.toString();
+	}
+
+	public String buildFastSystemPrompt()
+	{
+		int currentHp = client.getBoostedSkillLevel(Skill.HITPOINTS);
+		int maxHp = client.getRealSkillLevel(Skill.HITPOINTS);
+		int currentPrayer = client.getBoostedSkillLevel(Skill.PRAYER);
+		int maxPrayer = client.getRealSkillLevel(Skill.PRAYER);
+		double runEnergy = client.getEnergy() / 100.0;
+
+		StringBuilder sb = new StringBuilder();
+		sb.append("Current live state: ");
+		sb.append("HP: ").append(currentHp).append("/").append(maxHp).append(". ");
+		sb.append("Prayer: ").append(currentPrayer).append("/").append(maxPrayer).append(". ");
+		sb.append("Run energy: ").append(String.format("%.1f", runEnergy)).append("%. ");
+		sb.append("Coins: ").append(String.format("%,d", getCoins())).append(" gp. ");
+		sb.append("Inventory: ").append(emptyOr(getInventoryItems(), "Empty")).append(". ");
+		sb.append("Equipped: ").append(emptyOr(getEquippedItems(), "Nothing")).append(". ");
+		sb.append("Location: ").append(getPlayerLocation()).append(". ");
+		sb.append("Slayer task: ").append(getSlayerTask()).append(". ");
+		sb.append("Bank: ").append(getBankContents()).append(".");
+
+		return sb.toString();
+	}
+
+	private long getCoins()
+	{
+		ItemContainer inventory = client.getItemContainer(InventoryID.INVENTORY);
+		if (inventory == null)
+		{
+			return 0;
+		}
+		for (Item item : inventory.getItems())
+		{
+			if (item.getId() == 995) // Coins
+			{
+				return item.getQuantity();
+			}
+		}
+		return 0;
 	}
 
 	public String formatSkillName(String name)

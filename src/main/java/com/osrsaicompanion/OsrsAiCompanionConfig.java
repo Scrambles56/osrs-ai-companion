@@ -59,10 +59,22 @@ public interface OsrsAiCompanionConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "companionTone",
+		name = "Companion Tone",
+		description = "The personality Claude adopts when responding",
+		position = 4,
+		section = apiSection
+	)
+	default CompanionTone companionTone()
+	{
+		return CompanionTone.NONE;
+	}
+
+	@ConfigItem(
 		keyName = "playerGoal",
 		name = "Player Goal",
 		description = "Your current OSRS goal — Claude will always keep this in mind",
-		position = 4,
+		position = 5,
 		section = apiSection
 	)
 	default String playerGoal()

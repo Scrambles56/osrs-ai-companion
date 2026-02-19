@@ -1,5 +1,6 @@
 package com.osrsaicompanion.tools;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import lombok.RequiredArgsConstructor;
@@ -7,6 +8,11 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.VarPlayer;
 import net.runelite.api.Varbits;
+import net.runelite.client.game.ItemManager;
+import net.runelite.http.api.item.ItemPrice;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 /**
  * Defines and executes the tools exposed to Claude via the Anthropic tool use API.
@@ -44,7 +50,14 @@ public class ClaudeTools
 	private static final int TOTAL_HARD   = 57;
 	private static final int TOTAL_ELITE  = 43;
 
+	private static final String WIKI_API = "https://oldschool.runescape.wiki/api.php";
+
+	private static final String GE_API = "https://prices.runescape.com/api/v1/osrs";
+
 	private final Client client;
+	private final OkHttpClient httpClient;
+	private final Gson gson;
+	private final ItemManager itemManager;
 
 	// -------------------------------------------------------------------------
 	// Tool definitions (sent to Claude in every API request)
@@ -80,6 +93,48 @@ public class ClaudeTools
 		caTool.add("input_schema", caSchema);
 		tools.add(caTool);
 
+		JsonObject geTool = new JsonObject();
+		geTool.addProperty("name", "get_ge_price");
+		geTool.addProperty("description",
+			"Looks up the current Grand Exchange price for an OSRS item by name. " +
+			"Returns the latest buy and sell prices from the OSRS GE. " +
+			"Use this when the player asks how much something costs, whether something is worth buying or selling, " +
+			"or when giving money-making or shopping advice that depends on current market prices.");
+		JsonObject geProperties = new JsonObject();
+		JsonObject geItemProp = new JsonObject();
+		geItemProp.addProperty("type", "string");
+		geItemProp.addProperty("description", "The exact or approximate item name, e.g. 'Overload', 'Dragon bones', 'Abyssal whip'");
+		geProperties.add("item_name", geItemProp);
+		JsonObject geSchema = new JsonObject();
+		geSchema.addProperty("type", "object");
+		geSchema.add("properties", geProperties);
+		JsonArray geRequired = new JsonArray();
+		geRequired.add("item_name");
+		geSchema.add("required", geRequired);
+		geTool.add("input_schema", geSchema);
+		tools.add(geTool);
+
+		JsonObject wikiTool = new JsonObject();
+		wikiTool.addProperty("name", "search_wiki");
+		wikiTool.addProperty("description",
+			"Searches the Old School RuneScape wiki and returns the most relevant page content. " +
+			"Use this whenever the player asks about specific game mechanics, item stats, quest requirements, " +
+			"monster weaknesses, skill training methods, or anything that requires accurate up-to-date game information. " +
+			"Prefer this over your training data for OSRS-specific facts.");
+		JsonObject wikiProperties = new JsonObject();
+		JsonObject queryProp = new JsonObject();
+		queryProp.addProperty("type", "string");
+		queryProp.addProperty("description", "The search term to look up on the OSRS wiki, e.g. 'Overload', 'Mithril battleaxe', 'Dragon Slayer quest'");
+		wikiProperties.add("query", queryProp);
+		JsonObject wikiSchema = new JsonObject();
+		wikiSchema.addProperty("type", "object");
+		wikiSchema.add("properties", wikiProperties);
+		JsonArray wikiRequired = new JsonArray();
+		wikiRequired.add("query");
+		wikiSchema.add("required", wikiRequired);
+		wikiTool.add("input_schema", wikiSchema);
+		tools.add(wikiTool);
+
 		return tools;
 	}
 
@@ -89,12 +144,23 @@ public class ClaudeTools
 
 	public String execute(String toolName)
 	{
+		return execute(toolName, null);
+	}
+
+	public String execute(String toolName, JsonObject input)
+	{
 		switch (toolName)
 		{
 			case "get_achievement_diary_status":
 				return executeGetAchievementDiaryStatus();
 			case "get_combat_achievement_status":
 				return executeGetCombatAchievementStatus();
+			case "get_ge_price":
+				String itemName = input != null && input.has("item_name") ? input.get("item_name").getAsString() : "";
+				return executeGetGePrice(itemName);
+			case "search_wiki":
+				String query = input != null && input.has("query") ? input.get("query").getAsString() : "";
+				return executeSearchWiki(query);
 			default:
 				return "Unknown tool: " + toolName;
 		}
@@ -179,6 +245,160 @@ public class ClaudeTools
 			.append(", Elite=").append(eliteDone ? "complete" : "incomplete").append("\n");
 		sb.append("  Task bits: [").append(Integer.toBinaryString(bits1))
 			.append("][").append(Integer.toBinaryString(bits2)).append("]\n");
+	}
+
+	private String executeGetGePrice(String itemName)
+	{
+		if (itemName == null || itemName.trim().isEmpty())
+		{
+			return "No item name provided.";
+		}
+
+		// Resolve item name to ID via RuneLite's ItemManager search
+		java.util.List<ItemPrice> results = itemManager.search(itemName);
+		if (results == null || results.isEmpty())
+		{
+			return "No GE item found matching: " + itemName;
+		}
+
+		// Use the best match (first result)
+		ItemPrice match = results.get(0);
+		int itemId = match.getId();
+		String resolvedName = match.getName();
+
+		try
+		{
+			okhttp3.HttpUrl url = okhttp3.HttpUrl.get(GE_API).newBuilder()
+				.addPathSegment("latest")
+				.addQueryParameter("id", String.valueOf(itemId))
+				.build();
+
+			Request request = new Request.Builder()
+				.url(url)
+				.header("User-Agent", "osrs-ai-companion/1.0 (RuneLite plugin)")
+				.build();
+
+			try (Response response = httpClient.newCall(request).execute())
+			{
+				if (!response.isSuccessful() || response.body() == null)
+				{
+					return "GE price lookup failed: HTTP " + response.code();
+				}
+
+				JsonObject body = gson.fromJson(response.body().string(), JsonObject.class);
+				JsonObject data = body.has("data") ? body.getAsJsonObject("data") : null;
+				if (data == null || !data.has(String.valueOf(itemId)))
+				{
+					return "No price data available for: " + resolvedName;
+				}
+
+				JsonObject priceData = data.getAsJsonObject(String.valueOf(itemId));
+				long high = priceData.has("high") && !priceData.get("high").isJsonNull()
+					? priceData.get("high").getAsLong() : -1;
+				long low = priceData.has("low") && !priceData.get("low").isJsonNull()
+					? priceData.get("low").getAsLong() : -1;
+
+				StringBuilder sb = new StringBuilder();
+				sb.append("GE prices for ").append(resolvedName).append(" (ID: ").append(itemId).append("):\n");
+				sb.append("  Sell price (high): ").append(high >= 0 ? String.format("%,d", high) + " gp" : "N/A").append("\n");
+				sb.append("  Buy price (low):   ").append(low >= 0 ? String.format("%,d", low) + " gp" : "N/A");
+				return sb.toString();
+			}
+		}
+		catch (Exception e)
+		{
+			log.error("GE price lookup failed for: {}", itemName, e);
+			return "GE price lookup failed: " + e.getMessage();
+		}
+	}
+
+	private String executeSearchWiki(String query)
+	{
+		if (query == null || query.trim().isEmpty())
+		{
+			return "No search query provided.";
+		}
+
+		try
+		{
+			// First: search for the best matching page title
+			okhttp3.HttpUrl searchHttpUrl = okhttp3.HttpUrl.get(WIKI_API).newBuilder()
+				.addQueryParameter("action", "query")
+				.addQueryParameter("list", "search")
+				.addQueryParameter("srsearch", query)
+				.addQueryParameter("srnamespace", "0")
+				.addQueryParameter("srlimit", "1")
+				.addQueryParameter("format", "json")
+				.build();
+
+			Request searchRequest = new Request.Builder()
+				.url(searchHttpUrl)
+				.header("User-Agent", "osrs-ai-companion/1.0 (RuneLite plugin)")
+				.build();
+
+			String pageTitle;
+			try (Response searchResponse = httpClient.newCall(searchRequest).execute())
+			{
+				if (!searchResponse.isSuccessful() || searchResponse.body() == null)
+				{
+					return "Wiki search failed: HTTP " + searchResponse.code();
+				}
+				JsonObject searchResult = gson.fromJson(searchResponse.body().string(), JsonObject.class);
+				JsonArray results = searchResult
+					.getAsJsonObject("query")
+					.getAsJsonArray("search");
+				if (results.size() == 0)
+				{
+					return "No wiki page found for: " + query;
+				}
+				pageTitle = results.get(0).getAsJsonObject().get("title").getAsString();
+			}
+
+			// Second: fetch the page extract for the matched title
+			okhttp3.HttpUrl extractUrl = okhttp3.HttpUrl.get(WIKI_API).newBuilder()
+				.addQueryParameter("action", "query")
+				.addQueryParameter("prop", "extracts")
+				.addQueryParameter("titles", pageTitle)
+				.addQueryParameter("exintro", "false")
+				.addQueryParameter("explaintext", "true")
+				.addQueryParameter("exsectionformat", "plain")
+				.addQueryParameter("exchars", "3000")
+				.addQueryParameter("format", "json")
+				.build();
+
+			Request extractRequest = new Request.Builder()
+				.url(extractUrl)
+				.header("User-Agent", "osrs-ai-companion/1.0 (RuneLite plugin)")
+				.build();
+
+			try (Response extractResponse = httpClient.newCall(extractRequest).execute())
+			{
+				if (!extractResponse.isSuccessful() || extractResponse.body() == null)
+				{
+					return "Wiki fetch failed: HTTP " + extractResponse.code();
+				}
+				JsonObject extractResult = gson.fromJson(extractResponse.body().string(), JsonObject.class);
+				JsonObject pages = extractResult
+					.getAsJsonObject("query")
+					.getAsJsonObject("pages");
+
+				// Pages is keyed by page ID
+				JsonObject page = pages.entrySet().iterator().next().getValue().getAsJsonObject();
+				String extract = page.has("extract") ? page.get("extract").getAsString().trim() : "";
+
+				if (extract.isEmpty())
+				{
+					return "Wiki page '" + pageTitle + "' has no content.";
+				}
+
+				return "OSRS Wiki — " + pageTitle + ":\n\n" + extract;
+			}
+		}
+		catch (Exception e)
+		{
+			log.error("Wiki search failed for query: {}", query, e);
+			return "Wiki search failed: " + e.getMessage();
+		}
 	}
 
 	private String executeGetCombatAchievementStatus()
