@@ -172,6 +172,11 @@ public class OsrsAiCompanionPlugin extends Plugin
 		return config.playerGoal();
 	}
 
+	public CompanionTone getCompanionTone()
+	{
+		return config.companionTone();
+	}
+
 	@Provides
 	OsrsAiCompanionConfig provideConfig(ConfigManager configManager)
 	{

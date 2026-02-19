@@ -71,9 +71,10 @@ public class PlayerContextBuilder
 		}
 
 		sb.append("Be concise, helpful, and friendly. Do not use emojis. ");
-		sb.append("Each message in the conversation is prefixed with an ISO-8601 UTC timestamp. ");
-		sb.append("Use these timestamps to be temporally aware — for example, notice how long ago the player last levelled up, how quickly they are gaining levels, or how long they have been playing. ");
-		sb.append("Never include raw ISO-8601 timestamps in your replies — if you reference time, use natural language like '20 minutes ago' or 'that took you half an hour'. ");
+		sb.append("Each message in the conversation is prefixed with an ISO-8601 UTC timestamp in square brackets, e.g. [2026-01-01T12:00:00Z]. ");
+		sb.append("Use these timestamps internally to be temporally aware — for example, notice how long ago the player last levelled up, how quickly they are gaining levels, or how long they have been playing. ");
+		sb.append("IMPORTANT: Never reproduce or paraphrase ISO-8601 timestamps in your replies. Never write dates or times in any numeric format. ");
+		sb.append("If you reference time, use only natural language like 'about 20 minutes ago', 'just now', or 'earlier this session'. ");
 		sb.append("When the player levels up, keep your congratulation brief and make it personal by referencing their current situation — ");
 		sb.append("such as their HP, location, what they're doing, or their goal — rather than giving a generic response.");
 

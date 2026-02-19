@@ -26,14 +26,13 @@ public class AiCompanionPanel extends PluginPanel
 
 	private static final String INITIAL_HTML = "<html><body id='body'></body></html>";
 
-	private static final String CSS =
+	private static final String CSS_BASE =
 		"body { background-color: #282828; color: #c8c8c8; font-family: sans-serif; font-size: 12px; margin: 4px; }" +
 		".user { color: #64b4ff; font-weight: bold; text-align: right; margin: 4px 0; }" +
-		".claude { color: #c8c8c8; margin: 4px 0; }" +
 		".label { font-size: 10px; }" +
 		".thinking { color: #888888; font-style: italic; }" +
 		".error { color: #ff4444; margin: 4px 0; }" +
-		".event { color: #64b4ff; font-weight: bold; margin: 4px 0; }";
+		".event { color: #ffaa00; font-style: italic; margin: 4px 0; }";
 
 	public AiCompanionPanel(OsrsAiCompanionPlugin plugin)
 	{
@@ -110,7 +109,8 @@ public class AiCompanionPanel extends PluginPanel
 		chatArea.setEditorKit(editorKit);
 
 		javax.swing.text.html.StyleSheet styleSheet = editorKit.getStyleSheet();
-		styleSheet.addRule(CSS);
+		styleSheet.addRule(CSS_BASE);
+		styleSheet.addRule(buildClaudeCss());
 
 		chatArea.setText(INITIAL_HTML);
 
@@ -170,7 +170,8 @@ public class AiCompanionPanel extends PluginPanel
 		removeThinkingIndicator();
 		String stripped = stripEmoji(text);
 		String escaped = escapeHtml(stripped).replace("\n", "<br>");
-		appendHtml("<div class='claude'><span class='label'>Claude</span><br>" + escaped + "</div>");
+		String name = escapeHtml(getPersonaName());
+		appendHtml("<div class='claude'><span class='label'>" + name + "</span><br>" + escaped + "</div>");
 		setInputEnabled(true);
 	}
 
@@ -184,7 +185,8 @@ public class AiCompanionPanel extends PluginPanel
 
 	public void appendThinkingIndicator()
 	{
-		appendHtml("<div id='thinking' class='thinking'>Claude is thinking...</div>");
+		String name = escapeHtml(getPersonaName());
+		appendHtml("<div id='thinking' class='thinking'>" + name + " is thinking...</div>");
 		thinkingElement = ((HTMLDocument) chatArea.getDocument()).getElement("thinking");
 	}
 
@@ -207,6 +209,19 @@ public class AiCompanionPanel extends PluginPanel
 	{
 		inputField.setEnabled(enabled);
 		sendButton.setEnabled(enabled);
+	}
+
+	private String getPersonaName()
+	{
+		CompanionTone tone = plugin.getCompanionTone();
+		return tone != null ? tone.getDisplayName() : "Claude";
+	}
+
+	private String buildClaudeCss()
+	{
+		CompanionTone tone = plugin.getCompanionTone();
+		String colour = (tone != null) ? tone.getColour() : "#c8c8c8";
+		return ".claude { color: " + colour + "; margin: 4px 0; }";
 	}
 
 	private void appendHtml(String html)
