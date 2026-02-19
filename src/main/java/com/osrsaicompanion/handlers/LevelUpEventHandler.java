@@ -33,6 +33,7 @@ public class LevelUpEventHandler
 	// so we never compare against a stale getRealSkillLevel() value from LOGGED_IN.
 	private volatile boolean cacheReady = false;
 	private volatile boolean needsCacheInit = false;
+	private volatile boolean welcomeSent = false;
 
 	private void sendWelcomeMessage()
 	{
@@ -46,6 +47,7 @@ public class LevelUpEventHandler
 		skillXpCache.clear();
 		cacheReady = false;
 		needsCacheInit = false;
+		welcomeSent = false;
 	}
 
 	@Subscribe
@@ -83,7 +85,11 @@ public class LevelUpEventHandler
 			{
 				needsCacheInit = false;
 				cacheReady = true;
-				sendWelcomeMessage();
+				if (!welcomeSent)
+				{
+					welcomeSent = true;
+					sendWelcomeMessage();
+				}
 			}
 			return;
 		}
