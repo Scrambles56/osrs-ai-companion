@@ -365,6 +365,6 @@ public class ClaudeClient
 
 	private static String withTimestamp(String content)
 	{
-		return "[" + Instant.now().toString() + "] " + content;
+		return "<t:" + Instant.now().toString() + "> " + content;
 	}
 }

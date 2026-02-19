@@ -159,6 +159,7 @@ public class AiCompanionPanel extends PluginPanel
 		}
 		inputField.setText("");
 		setInputEnabled(false);
+		appendUserMessage(text);
 		plugin.sendMessage(text);
 	}
 
