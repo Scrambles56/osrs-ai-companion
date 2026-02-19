@@ -1,4 +1,7 @@
-# OSRS AI Companion
+<p align="center">
+  <img src="docs/icon_large.png" width="128" alt="OSRS AI Companion"/>
+  <h1 align="center">OSRS AI Companion</h1>
+</p>
 
 A RuneLite plugin that brings Claude AI into Old School RuneScape as a context-aware companion. It knows who you are, where you are, and what you're doing — and reacts accordingly.
 
