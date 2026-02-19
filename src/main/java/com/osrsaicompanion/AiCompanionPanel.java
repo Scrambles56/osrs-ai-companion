@@ -28,11 +28,14 @@ public class AiCompanionPanel extends PluginPanel
 
 	private static final String CSS_BASE =
 		"body { background-color: #282828; color: #c8c8c8; font-family: sans-serif; font-size: 12px; margin: 4px; }" +
-		".user { color: #64b4ff; font-weight: bold; text-align: right; margin: 4px 0; }" +
-		".label { font-size: 10px; }" +
-		".thinking { color: #888888; font-style: italic; }" +
-		".error { color: #ff4444; margin: 4px 0; }" +
-		".event { color: #ffaa00; font-style: italic; margin: 4px 0; }";
+		".user-row { text-align: right; margin: 6px 0; }" +
+		".user-bubble { display: inline-block; background-color: #1a3a5c; color: #64b4ff; border-radius: 12px 12px 2px 12px; padding: 6px 10px; max-width: 85%; text-align: left; }" +
+		".claude-row { text-align: left; margin: 6px 0; }" +
+		".claude-bubble { display: inline-block; background-color: #1e1e1e; border-radius: 12px 12px 12px 2px; padding: 6px 10px; max-width: 85%; }" +
+		".label { font-size: 10px; opacity: 0.7; margin-bottom: 2px; }" +
+		".thinking { color: #888888; font-style: italic; margin: 4px 6px; }" +
+		".error { color: #ff4444; margin: 4px 6px; }" +
+		".event { color: #ffaa00; font-style: italic; text-align: center; margin: 4px 0; font-size: 11px; }";
 
 	public AiCompanionPanel(OsrsAiCompanionPlugin plugin)
 	{
@@ -162,7 +165,13 @@ public class AiCompanionPanel extends PluginPanel
 	public void appendUserMessage(String text)
 	{
 		String escaped = escapeHtml(text);
-		appendHtml("<div class='user'><span class='label'>You</span><br>" + escaped + "</div>");
+		appendHtml(
+			"<div class='user-row'>" +
+			"<div class='user-bubble'>" +
+			"<div class='label'>You</div>" +
+			escaped +
+			"</div></div>"
+		);
 	}
 
 	public void appendClaudeMessage(String text)
@@ -171,7 +180,13 @@ public class AiCompanionPanel extends PluginPanel
 		String stripped = stripEmoji(text);
 		String escaped = escapeHtml(stripped).replace("\n", "<br>");
 		String name = escapeHtml(getPersonaName());
-		appendHtml("<div class='claude'><span class='label'>" + name + "</span><br>" + escaped + "</div>");
+		appendHtml(
+			"<div class='claude-row'>" +
+			"<div class='claude-bubble'>" +
+			"<div class='label'>" + name + "</div>" +
+			escaped +
+			"</div></div>"
+		);
 		setInputEnabled(true);
 	}
 
@@ -221,7 +236,7 @@ public class AiCompanionPanel extends PluginPanel
 	{
 		CompanionTone tone = plugin.getCompanionTone();
 		String colour = (tone != null) ? tone.getColour() : "#c8c8c8";
-		return ".claude { color: " + colour + "; margin: 4px 0; }";
+		return ".claude-bubble { color: " + colour + "; }";
 	}
 
 	private void appendHtml(String html)
