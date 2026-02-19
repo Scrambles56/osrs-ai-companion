@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <circle cx="128" cy="128" r="123" fill="rgba(20, 18, 12, 0.9)" stroke="rgb(80, 70, 40)" stroke-width="6"/>
+  <ellipse cx="128" cy="128" rx="78" ry="88" fill="rgba(60, 50, 20, 0.47)" />
+  <rect x="58" y="52" width="140" height="152" rx="3" fill="rgb(120, 70, 30)" stroke="rgb(80, 45, 15)" stroke-width="4"/>
+  <line x1="128" y1="52" x2="128" y2="204" stroke="rgb(80, 45, 15)" stroke-width="8"/>
+  <rect x="68" y="62" width="56" height="132" fill="rgb(240, 230, 200)"/>
+  <rect x="132" y="62" width="56" height="132" fill="rgb(240, 230, 200)"/>
+  <line x1="78" y1="78" x2="114" y2="78" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <line x1="78" y1="94" x2="114" y2="94" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <line x1="78" y1="110" x2="114" y2="110" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <line x1="78" y1="126" x2="114" y2="126" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <line x1="78" y1="142" x2="114" y2="142" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <line x1="78" y1="158" x2="114" y2="158" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <line x1="78" y1="174" x2="114" y2="174" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <line x1="142" y1="78" x2="178" y2="78" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <line x1="142" y1="94" x2="178" y2="94" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <line x1="142" y1="110" x2="178" y2="110" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <line x1="142" y1="126" x2="178" y2="126" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <line x1="142" y1="142" x2="178" y2="142" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <line x1="142" y1="158" x2="178" y2="158" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <line x1="142" y1="174" x2="178" y2="174" stroke="rgba(100, 85, 60, 0.63)" stroke-width="2"/>
+  <g fill="rgb(255, 200, 60)" opacity="0.94">
+    <line x1="128" y1="20" x2="128" y2="32" stroke="rgb(255, 200, 60)" stroke-width="3"/>
+    <line x1="122" y1="26" x2="134" y2="26" stroke="rgb(255, 200, 60)" stroke-width="3"/>
+    <line x1="128" y1="224" x2="128" y2="236" stroke="rgb(255, 200, 60)" stroke-width="3"/>
+    <line x1="122" y1="230" x2="134" y2="230" stroke="rgb(255, 200, 60)" stroke-width="3"/>
+    <line x1="42" y1="58" x2="42" y2="70" stroke="rgb(255, 200, 60)" stroke-width="3"/>
+    <line x1="36" y1="64" x2="48" y2="64" stroke="rgb(255, 200, 60)" stroke-width="3"/>
+    <line x1="214" y1="58" x2="214" y2="70" stroke="rgb(255, 200, 60)" stroke-width="3"/>
+    <line x1="208" y1="64" x2="220" y2="64" stroke="rgb(255, 200, 60)" stroke-width="3"/>
+    <line x1="42" y1="186" x2="42" y2="198" stroke="rgb(255, 200, 60)" stroke-width="3"/>
+    <line x1="36" y1="192" x2="48" y2="192" stroke="rgb(255, 200, 60)" stroke-width="3"/>
+    <line x1="214" y1="186" x2="214" y2="198" stroke="rgb(255, 200, 60)" stroke-width="3"/>
+    <line x1="208" y1="192" x2="220" y2="192" stroke="rgb(255, 200, 60)" stroke-width="3"/>
+  </g>
+  <g fill="rgb(200, 160, 40)" opacity="0.59">
+    <line x1="30" y1="104" x2="30" y2="112" stroke="rgb(200, 160, 40)" stroke-width="2"/>
+    <line x1="26" y1="108" x2="34" y2="108" stroke="rgb(200, 160, 40)" stroke-width="2"/>
+    <line x1="226" y1="104" x2="226" y2="112" stroke="rgb(200, 160, 40)" stroke-width="2"/>
+    <line x1="222" y1="108" x2="230" y2="108" stroke="rgb(200, 160, 40)" stroke-width="2"/>
+    <line x1="30" y1="144" x2="30" y2="152" stroke="rgb(200, 160, 40)" stroke-width="2"/>
+    <line x1="26" y1="148" x2="34" y2="148" stroke="rgb(200, 160, 40)" stroke-width="2"/>
+    <line x1="226" y1="144" x2="226" y2="152" stroke="rgb(200, 160, 40)" stroke-width="2"/>
+    <line x1="222" y1="148" x2="230" y2="148" stroke="rgb(200, 160, 40)" stroke-width="2"/>
+    <line x1="54" y1="38" x2="54" y2="46" stroke="rgb(200, 160, 40)" stroke-width="2"/>
+    <line x1="50" y1="42" x2="58" y2="42" stroke="rgb(200, 160, 40)" stroke-width="2"/>
+    <line x1="202" y1="38" x2="202" y2="46" stroke="rgb(200, 160, 40)" stroke-width="2"/>
+    <line x1="198" y1="42" x2="206" y2="42" stroke="rgb(200, 160, 40)" stroke-width="2"/>
+  </g>
+</svg>

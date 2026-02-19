@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/icon_large.png" width="128" alt="OSRS AI Companion"/>
+  <img src="docs/icon_large.svg" width="128" alt="OSRS AI Companion"/>
   <h1 align="center">OSRS AI Companion</h1>
 </p>
 
